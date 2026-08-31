@@ -1,0 +1,54 @@
+# Virtual Environment
+venv/
+venv*/
+env/
+.env/
+.venv/
+
+# Python cache
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+
+# Database
+*.db
+*.sqlite
+*.sqlite3
+~/.k8s-guard/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+logs/
+
+# Temporary files
+*.tmp
+*.temp
+~*
+
+# Docker
+*.tar
+*.tar.gz
+
+# Secrets
+.env
+*.pem
+*.key
+*.crt
+
+# Build artifacts
+dist/
+build/
+*.egg-info/
+*.egg
