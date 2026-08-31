@@ -1,0 +1,2 @@
+[console_scripts]
+k8s-guard = k8s_guard.main:cli
