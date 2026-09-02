@@ -11,6 +11,7 @@ from .core.config import Config
 from .core.database import Database
 from .k8s.client import K8sClient
 from .k8s.watcher import PodWatcher
+from .k8s.node_manager import NodeManager
 from .ui.app import create_ui
 
 console = Console()
@@ -40,6 +41,19 @@ def start(namespace, ui, port, in_cluster):
     
     k8s = K8sClient(config.kubeconfig, config.in_cluster)
     
+    # Node manager callbacks
+    def on_node_issue(node):
+        console.print(f"[red]⚠ Node issue:[/red] {node['name']} - {node['condition']}")
+        if node['condition'] == 'Ready' and node['status'] == 'False':
+            if k8s.core_v1.read_node(node['name']):
+                node_manager.cordon_node(node['name'])
+                db.add_action('cordon', 'node', node['name'], '', 
+                             'success', f'Cordoned due to: {node["reason"]}')
+                console.print(f"[yellow]🚫 Node {node['name']} cordoned[/yellow]")
+    
+    node_manager = NodeManager(k8s, db, on_node_issue)
+    
+    # Pod watcher callbacks
     def on_pod_failure(pod):
         console.print(f"[red]⚠ Pod failure:[/red] {pod['name']} - {pod['reason']}")
         if k8s.delete_pod(pod['name'], pod['namespace']):
@@ -58,11 +72,19 @@ def start(namespace, ui, port, in_cluster):
     
     watcher_thread = threading.Thread(target=run_watcher, daemon=True)
     watcher_thread.start()
-    console.print("[yellow]✓[/yellow] Watcher running in background")
+    console.print("[yellow]✓[/yellow] Pod watcher running")
+    
+    # Start node monitor in background thread
+    def run_node_monitor():
+        node_manager.monitor_forever(30)
+    
+    node_thread = threading.Thread(target=run_node_monitor, daemon=True)
+    node_thread.start()
+    console.print("[yellow]✓[/yellow] Node monitor running")
     
     if ui:
         console.print("[yellow]🔮 Starting UI...[/yellow]")
-        app = create_ui(db, k8s)
+        app = create_ui(db, k8s, node_manager)
         app.launch(server_name='0.0.0.0', server_port=port, share=False)
     else:
         console.print("[yellow]Agent running (no UI)[/yellow]")
@@ -82,16 +104,11 @@ def status():
     table.add_row("Storage", stats['storage_limit'])
     table.add_row("Total Actions", str(stats['total_actions']))
     console.print(table)
-    
-    actions = db.get_actions(limit=5)
-    if actions:
-        console.print("\n[bold]Recent Actions:[/bold]")
-        for a in actions:
-            console.print(f"  {a['timestamp'][:19]} - {a['action_type']}: {a['resource_name']}")
 
 @cli.command()
 def version():
-    console.print("[bold blue]k8s-guard[/bold blue] v0.1.0")
+    console.print("[bold blue]k8s-guard[/bold blue] v0.2.0 - Node Management")
+    console.print("Autonomous Kubernetes Agent")
 
 if __name__ == '__main__':
     cli()
