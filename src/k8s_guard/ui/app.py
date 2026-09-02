@@ -6,94 +6,59 @@ from ..k8s.node_manager import NodeManager
 
 def create_ui(db: Database, k8s: K8sClient, node_manager: NodeManager = None):
     
-    def get_stats_data():
-        stats = db.get_stats()
-        actions = db.get_actions(limit=10)
-        node_status = node_manager.get_node_status() if node_manager else []
-        
-        nodes_text = ""
-        if node_status:
-            for node in node_status:
-                icon = "✅" if node['status'] == 'Ready' else "❌"
-                cordon = "🔒 Cordoned" if not node['schedulable'] else "🔓 Schedulable"
-                nodes_text += f"{icon} {node['name']} | {node['status']} | {cordon}\n"
-        else:
-            nodes_text = "No nodes found"
-        
-        actions_text = ""
-        if actions:
-            for a in actions:
-                icon = "✅" if a['status'] == 'success' else "❌"
-                actions_text += f"{icon} {a['timestamp'][:19]} | {a['action_type']} | {a['resource_name']}\n"
-        else:
-            actions_text = "No actions yet"
-        
-        return {
-            "total_actions": stats['total_actions'],
-            "nodes_count": len(node_status),
-            "actions_count": len(actions),
-            "nodes_text": nodes_text,
-            "actions_text": actions_text,
-            "license": "🔓 Pro" if stats['is_pro'] else "🆓 Free",
-            "time": datetime.now().strftime('%H:%M:%S')
-        }
-    
     with gr.Blocks(title="k8s-guard", theme=gr.themes.Soft()) as app:
         
-        # Header
+        gr.Markdown("# 🚀 k8s-guard")
+        gr.Markdown("Auto-heal · Monitor · Optimize")
+        
         with gr.Row():
             with gr.Column():
-                gr.Markdown("# 🚀 k8s-guard")
-                gr.Markdown("*Autonomous Kubernetes Agent — Auto-heal, Monitor & Optimize*")
+                total_actions = gr.Number(label="Total Actions", value=0, interactive=False)
+            with gr.Column():
+                nodes_count = gr.Number(label="Nodes", value=0, interactive=False)
+            with gr.Column():
+                actions_count = gr.Number(label="Recent Actions", value=0, interactive=False)
         
-        # Stats - 3 columns
         with gr.Row():
             with gr.Column():
-                gr.Markdown("### 📊 Total Actions")
-                total_actions = gr.Number(value=0, label="", interactive=False)
+                nodes_output = gr.Textbox(label="Node Status", lines=4, interactive=False)
             with gr.Column():
-                gr.Markdown("### 🖥️ Nodes")
-                nodes_count = gr.Number(value=0, label="", interactive=False)
-            with gr.Column():
-                gr.Markdown("### 📋 Recent")
-                actions_count = gr.Number(value=0, label="", interactive=False)
+                actions_output = gr.Textbox(label="Action History", lines=4, interactive=False)
         
-        # Main content - 2 columns
         with gr.Row():
-            with gr.Column():
-                gr.Markdown("### 🖥️ Node Status")
-                nodes_output = gr.Textbox(value="", label="", lines=5, interactive=False)
-            with gr.Column():
-                gr.Markdown("### 📋 Action History")
-                actions_output = gr.Textbox(value="", label="", lines=5, interactive=False)
+            license_status = gr.Textbox(label="License", value="Free", interactive=False)
+            timestamp = gr.Textbox(label="Last Updated", value="", interactive=False)
         
-        # Footer - 2 columns
-        with gr.Row():
-            with gr.Column():
-                license_status = gr.Textbox(value="", label="🔑 License", interactive=False)
-            with gr.Column():
-                timestamp = gr.Textbox(value="", label="⏱️ Updated", interactive=False)
+        refresh_btn = gr.Button("Refresh")
         
-        # Refresh button
-        refresh_btn = gr.Button("🔄 Refresh Dashboard", variant="primary")
-        
-        def update_dashboard():
-            data = get_stats_data()
+        def update():
+            stats = db.get_stats()
+            actions = db.get_actions(limit=10)
+            node_status = node_manager.get_node_status() if node_manager else []
+            
+            nodes_text = ""
+            for node in node_status:
+                nodes_text += f"{node['name']} | {node['status']}\n"
+            
+            actions_text = ""
+            for a in actions:
+                actions_text += f"{a['timestamp'][:19]} | {a['action_type']} | {a['resource_name']}\n"
+            
             return [
-                data["total_actions"],
-                data["nodes_count"],
-                data["actions_count"],
-                data["nodes_text"],
-                data["actions_text"],
-                data["license"],
-                data["time"]
+                stats['total_actions'],
+                len(node_status),
+                len(actions),
+                nodes_text or "No nodes",
+                actions_text or "No actions",
+                "Pro" if stats['is_pro'] else "Free",
+                datetime.now().strftime('%H:%M:%S')
             ]
         
         refresh_btn.click(
-            update_dashboard,
+            update,
             outputs=[total_actions, nodes_count, actions_count, nodes_output, actions_output, license_status, timestamp]
         )
         
-        app.load(update_dashboard, outputs=[total_actions, nodes_count, actions_count, nodes_output, actions_output, license_status, timestamp])
+        app.load(update, outputs=[total_actions, nodes_count, actions_count, nodes_output, actions_output, license_status, timestamp])
     
     return app
