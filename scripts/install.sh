@@ -13,6 +13,7 @@ NC='\033[0m'
 print_info() { echo -e "${BLUE}[INFO]${NC} $1"; }
 print_success() { echo -e "${GREEN}[SUCCESS]${NC} $1"; }
 print_error() { echo -e "${RED}[ERROR]${NC} $1"; }
+print_warning() { echo -e "${YELLOW}[WARNING]${NC} $1"; }
 
 echo "═══════════════════════════════════════════════════════════════"
 echo "  🛡️ k8s-guard - Kubernetes Auto-Heal Agent"
@@ -20,10 +21,13 @@ echo "  Version: 1.0.0"
 echo "═══════════════════════════════════════════════════════════════"
 echo ""
 
-# Check kubectl
+# Auto-install kubectl if missing
 if ! command -v kubectl &> /dev/null; then
-    print_error "kubectl is not installed. Please install kubectl first."
-    exit 1
+    print_warning "kubectl is not installed. Installing..."
+    curl -LO "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl"
+    chmod +x kubectl
+    sudo mv kubectl /usr/local/bin/
+    print_success "kubectl installed"
 fi
 
 # Clone repository
