@@ -84,6 +84,13 @@ sudo systemctl daemon-reload
 sudo systemctl enable k8s-guard
 sudo systemctl start k8s-guard
 
+# Open firewall port
+if command -v firewall-cmd &> /dev/null; then
+    print_info "Opening firewall port 7860..."
+    sudo firewall-cmd --add-port=7860/tcp --permanent 2>/dev/null || true
+    sudo firewall-cmd --reload 2>/dev/null || true
+fi
+
 print_success "✅ k8s-guard installation complete!"
 echo ""
 echo "📋 Installation Summary:"
