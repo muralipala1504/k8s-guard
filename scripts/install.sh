@@ -58,6 +58,17 @@ if command -v getenforce &> /dev/null && [[ $(getenforce) == "Enforcing" ]]; the
     sudo restorecon -Rv /home/ruser/k8s-guard/venv/bin/ 2>/dev/null || true
 fi
 
+# Create wrapper script
+print_info "Creating wrapper script..."
+cat > /home/ruser/k8s-guard/run-k8s-guard.sh << 'WRAPPEREOF'
+#!/bin/bash
+export PYTHONPATH=/home/ruser/k8s-guard
+cd /home/ruser/k8s-guard
+source venv/bin/activate
+exec python dashboard/app.py
+WRAPPEREOF
+chmod +x /home/ruser/k8s-guard/run-k8s-guard.sh
+
 # Create systemd service
 print_info "Installing systemd service..."
 sudo tee /etc/systemd/system/k8s-guard.service > /dev/null << 'SERVICEEOF'
@@ -68,9 +79,7 @@ After=network.target
 [Service]
 Type=simple
 User=ruser
-WorkingDirectory=/home/ruser/k8s-guard
-Environment="PYTHONPATH=/home/ruser/k8s-guard"
-ExecStart=/home/ruser/k8s-guard/venv/bin/python /home/ruser/k8s-guard/dashboard/app.py
+ExecStart=/bin/bash /home/ruser/k8s-guard/run-k8s-guard.sh
 Restart=always
 RestartSec=10
 StandardOutput=append:/var/log/k8s-guard.log
