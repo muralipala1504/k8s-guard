@@ -14,10 +14,13 @@
 | **Dashboard** | Web UI showing cluster status and action history |
 | **Free Tier** | 7-day action history |
 | **Pro Tier** | Unlimited history + Slack alerts + Multi-cluster |
+| **Auto-Kubeconfig** | ✅ Automatically configures Kubernetes access |
 
 ---
 
 ## ⚡ Quick Start
+
+**✨ No manual configuration needed** — the installer automatically sets up kubectl and Kubernetes access.
 
 ### Prerequisites
 
