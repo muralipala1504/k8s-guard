@@ -1,13 +1,20 @@
+import warnings
+warnings.filterwarnings("ignore")
+import sys
+import os
+
+# Add project root to Python path
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
 import gradio as gr
 import docker
 import subprocess
 import json
 import time
 from datetime import datetime
-import sys
-sys.path.insert(0, '/home/ruser/projects/k8s-guard')
 
 from src.k8s_guard.k8s_client import K8sClient
+from src.k8s_guard.history import get_history
 import logging
 logging.basicConfig(level=logging.INFO)
 
@@ -52,19 +59,15 @@ def get_k8s_pods():
 def refresh():
     global action_history
     
-    # Auto-Heal runs first
     heal_actions = k8s_auto_heal()
-    
     nodes = get_k8s_nodes()
     pods = get_k8s_pods()
     
-    # Node status
     node_text = "## 🖥️ Nodes\n\n"
     for n in nodes:
         icon = "🟢" if n["status"] == "Ready" else "🔴"
         node_text += f"{icon} **{n['name']}**: {n['status']}\n"
     
-    # Pod status
     pod_text = "## 📦 Pods\n\n"
     for p in pods:
         status = p["status"]
@@ -75,17 +78,17 @@ def refresh():
             pod_text += f" - {reason}"
         pod_text += "\n"
     
-    # Action history (show ALL actions)
+    # Action history from JSON file
+    history = get_history(10)
     history_text = "## 📜 Recent Actions\n\n"
-    if action_history:
-        for action in action_history[-10:]:  # Show last 10 actions
-            history_text += f"**{action['time']}** — {action['pod']} — {action['action']} ({action.get('reason', '')})\n"
+    if history:
+        for action in history:
+            history_text += f"**{action['timestamp']}** — {action['action']} {action['resource']} {action['name']} — {action['status']}\n"
     else:
         history_text += "No actions recorded yet.\n"
     
     return node_text, pod_text, history_text
 
-# Manual Restart Handler
 def manual_restart_pod(name):
     try:
         k8s.delete_pod("default", name)
@@ -116,13 +119,8 @@ with gr.Blocks(theme=gr.themes.Soft()) as demo:
         restart_btn = gr.Button("🔄 Delete Pod (Auto-Heal Test)")
         restart_result = gr.Textbox(label="Result", interactive=False)
     
-    # Refresh button
     refresh_btn.click(refresh, outputs=[nodes_output, pods_output, history_output])
-    
-    # Restart button
     restart_btn.click(manual_restart_pod, inputs=[pod_name], outputs=[restart_result])
-    
-    # Auto-refresh on load
     demo.load(refresh, outputs=[nodes_output, pods_output, history_output])
 
 if __name__ == "__main__":

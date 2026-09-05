@@ -9,10 +9,14 @@ import logging
 from datetime import datetime
 from kubernetes import client, config
 
+# Import history module
+from .history import save_action
+
 logger = logging.getLogger(__name__)
 
 class K8sClient:
     def __init__(self):
+        """Initialize Kubernetes client"""
         try:
             config.load_incluster_config()
             logger.info("✅ Loaded in-cluster Kubernetes config")
@@ -29,6 +33,7 @@ class K8sClient:
         self.batch_v1 = client.BatchV1Api()
     
     def get_pods(self, namespace="default"):
+        """Get all pods in a namespace"""
         try:
             pods = self.core_v1.list_namespaced_pod(namespace)
             return pods.items
@@ -37,6 +42,7 @@ class K8sClient:
             return []
     
     def get_pod_status(self, pod):
+        """Extract pod status"""
         status = pod.status.phase
         reason = ""
         container_statuses = pod.status.container_statuses or []
@@ -61,6 +67,7 @@ class K8sClient:
         }
     
     def get_nodes(self):
+        """Get all nodes with full status"""
         try:
             nodes = self.core_v1.list_node()
             result = []
@@ -89,6 +96,7 @@ class K8sClient:
             return []
     
     def get_deployments(self, namespace="default"):
+        """Get all deployments"""
         try:
             deployments = self.apps_v1.list_namespaced_deployment(namespace)
             return deployments.items
@@ -97,6 +105,7 @@ class K8sClient:
             return []
     
     def scale_deployment(self, namespace, name, replicas):
+        """Scale a deployment to the specified number of replicas"""
         try:
             self.apps_v1.patch_namespaced_deployment_scale(
                 name=name,
@@ -110,15 +119,18 @@ class K8sClient:
             return False
     
     def delete_pod(self, namespace, name):
+        """Delete a pod (triggers auto-restart if part of a deployment)"""
         try:
             self.core_v1.delete_namespaced_pod(name=name, namespace=namespace)
             logger.info(f"🗑️ Deleted pod {name} in namespace {namespace}")
+            save_action("delete", "pod", name, "success", "Pod deleted by user")
             return True
         except Exception as e:
             logger.error(f"❌ Failed to delete pod {name}: {e}")
             return False
     
     def auto_heal_pods(self, namespace="default"):
+        """Auto-heal failed pods"""
         pods = self.get_pods(namespace)
         actions = []
         failure_conditions = ["CrashLoopBackOff", "ImagePullBackOff", "Error", "Failed", "OOMKilled"]
@@ -141,6 +153,7 @@ class K8sClient:
             if needs_heal:
                 logger.warning(f"⚠️ Pod {status['name']} needs healing: {heal_reason}")
                 self.delete_pod(namespace, status["name"])
+                save_action("delete", "pod", status["name"], "success", heal_reason)
                 actions.append({
                     "time": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
                     "pod": status["name"],
@@ -151,6 +164,7 @@ class K8sClient:
         return actions
     
     def auto_heal_nodes(self):
+        """Auto-heal unhealthy nodes"""
         nodes = self.get_nodes()
         actions = []
         for node in nodes:
@@ -168,6 +182,7 @@ class K8sClient:
                     import subprocess
                     subprocess.run(["kubectl", "uncordon", node["name"]], check=True)
                     logger.info(f"✅ Uncordoned node {node['name']}")
+                    save_action("uncordon", "node", node["name"], "success", "SchedulingDisabled")
                     actions.append({
                         "time": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
                         "node": node["name"],
@@ -179,6 +194,7 @@ class K8sClient:
         return actions
     
     def auto_scale_deployments(self, namespace="default"):
+        """Auto-scale deployments based on pod status"""
         deployments = self.get_deployments(namespace)
         actions = []
         
@@ -202,13 +218,13 @@ class K8sClient:
                 if match:
                     total_pods += 1
                     status = self.get_pod_status(pod)
-                    # Now check for any non-Running status OR high restarts (> 1)
                     if status["status"] != "Running" or status["restarts"] > 1:
                         failing_pods += 1
             
             if total_pods > 0 and failing_pods / total_pods > 0.5 and replicas > 1:
                 new_replicas = max(1, replicas - 1)
                 self.scale_deployment(namespace, name, new_replicas)
+                save_action("scale", "deployment", name, "success", f"{replicas}->{new_replicas}")
                 actions.append({
                     "time": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
                     "deployment": name,
@@ -218,6 +234,7 @@ class K8sClient:
                 })
             elif total_pods == 0:
                 self.scale_deployment(namespace, name, 1)
+                save_action("scale", "deployment", name, "success", "0->1")
                 actions.append({
                     "time": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
                     "deployment": name,
