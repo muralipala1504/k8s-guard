@@ -58,59 +58,22 @@ if command -v getenforce &> /dev/null && [[ $(getenforce) == "Enforcing" ]]; the
     sudo restorecon -Rv /home/ruser/k8s-guard/venv/bin/ 2>/dev/null || true
 fi
 
-# Create wrapper script
-print_info "Creating wrapper script..."
-cat > /home/ruser/k8s-guard/run-k8s-guard.sh << 'WRAPPEREOF'
-#!/bin/bash
-export PYTHONPATH=/home/ruser/k8s-guard
-cd /home/ruser/k8s-guard
-source venv/bin/activate
-exec python dashboard/app.py
-WRAPPEREOF
-chmod +x /home/ruser/k8s-guard/run-k8s-guard.sh
-
-# Create systemd service
-print_info "Installing systemd service..."
-sudo tee /etc/systemd/system/k8s-guard.service > /dev/null << 'SERVICEEOF'
-[Unit]
-Description=k8s-guard - Kubernetes Auto-Heal Agent
-After=network.target
-
-[Service]
-Type=simple
-User=ruser
-ExecStart=/bin/bash /home/ruser/k8s-guard/run-k8s-guard.sh
-Restart=always
-RestartSec=10
-StandardOutput=append:/var/log/k8s-guard.log
-StandardError=append:/var/log/k8s-guard-error.log
-
-[Install]
-WantedBy=multi-user.target
-SERVICEEOF
-
-sudo systemctl daemon-reload
-sudo systemctl enable k8s-guard
-sudo systemctl start k8s-guard
-
-# Open firewall port
-if command -v firewall-cmd &> /dev/null; then
-    print_info "Opening firewall port 7860..."
-    sudo firewall-cmd --add-port=7860/tcp --permanent 2>/dev/null || true
-    sudo firewall-cmd --reload 2>/dev/null || true
-fi
-
-print_success "✅ k8s-guard installation complete!"
-echo ""
-echo "📋 Installation Summary:"
-echo "  📁 Location: /home/ruser/k8s-guard"
-echo "  🔧 Service: k8s-guard (systemd)"
-echo "  📊 Dashboard: http://$(hostname -I | awk '{print $1}'):7860"
-echo "  📝 Logs: /var/log/k8s-guard.log"
-echo "  🔐 Status: sudo systemctl status k8s-guard"
-echo ""
-echo "📚 Useful Commands:"
-echo "  sudo systemctl status k8s-guard  # Check service status"
-echo "  sudo journalctl -u k8s-guard -f  # View logs"
-echo ""
-echo "🔗 GitHub: https://github.com/muralipala1504/k8s-guard"
+# Auto-configure kubeconfig
+print_info "Configuring Kubernetes access..."
+mkdir -p ~/.kube
+cat > ~/.kube/config << EOF
+apiVersion: v1
+clusters:
+- cluster:
+    server: http://192.168.217.171:8001
+    insecure-skip-tls-verify: true
+  name: minikube
+contexts:
+- context:
+    cluster: minikube
+    user: minikube
+  name: minikube
+current-context: minikube
+kind: Config
+preferences: {}
+users: []
