@@ -14,6 +14,16 @@ k8s-guard is a Python-based agent that monitors Kubernetes clusters and automati
 | **Deployment Scaler** | Auto-scales failing deployments |
 | **Dashboard** | Web UI for monitoring and actions |
 
+## Continuous Agent
+
+The agent runs in the background every 30 seconds:
+
+1. **Check pods** → delete failing pods (CrashLoopBackOff, Error)
+2. **Check nodes** → uncordon if SchedulingDisabled
+3. **Check deployments** → scale down if >50% failing
+4. **Log all actions** to history file
+5. **Send Slack alerts** (Pro) for every action
+
 ## Data Flow
 Kubernetes API → k8s-guard Agent → Auto-Heal Actions → Dashboard
 

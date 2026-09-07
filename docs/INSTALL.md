@@ -28,3 +28,24 @@ curl http://localhost:7860
 
 # Check logs
 tail -f /var/log/k8s-guard.log
+
+## 🐛 Troubleshooting
+
+### Service fails to start
+```bash
+sudo journalctl -u k8s-guard -n 50 --no-pager
+
+Slack alerts not working
+
+sudo journalctl -u k8s-guard -n 20 --no-pager | grep -i slack
+
+Auto-heal not triggering
+
+sudo tail -20 /var/log/k8s-guard.log
+
+Dashboard not accessible
+
+sudo firewall-cmd --list-ports
+sudo systemctl status k8s-guard
+
+

@@ -42,6 +42,29 @@ python dashboard/app.py
 📊 Dashboard
 Access the dashboard at http://localhost:7860
 
+## 💬 Slack Alerts (Pro)
+
+Configure Slack alerts for real-time notifications:
+
+```bash
+sudo tee -a /etc/systemd/system/k8s-guard.service << 'EOF'
+Environment="SLACK_WEBHOOK_URL=https://hooks.slack.com/services/YOUR/WEBHOOK/URL"
+EOF
+
+sudo systemctl daemon-reload
+sudo systemctl restart k8s-guard
+
+Alert Example
+
+🛡️ k8s-guard Alert
+Action: delete
+Resource: pod
+Name: fail-pod
+Status: success
+Time: 2026-09-07 06:29:21
+
+
+
 Nodes: Status of all nodes
 
 Pods: Running/Error pods with restart counts
