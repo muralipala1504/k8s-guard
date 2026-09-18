@@ -1,5 +1,5 @@
 """
-k8s-guard Slack Alerts (Pro)
+k8s-guard Slack Alerts
 Sends notifications to Slack for auto-heal events
 """
 
@@ -32,7 +32,7 @@ def send_slack_alert(action, resource, name, status, details=""):
                 "elements": [
                     {
                         "type": "mrkdwn",
-                        "text": "🔐 *k8s-guard Pro* - Kubernetes Auto-Heal Agent"
+                        "text": "🔐 *k8s-guard* - Kubernetes Auto-Heal Agent"
                     }
                 ]
             }
